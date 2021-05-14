@@ -82,7 +82,8 @@ fullfname = strcat(fname,fTime)
 %9I%20.9G%20.9G%20.9G
 
 *CFWRITE,'-1'
-*CFWRITE,'! END OF NODAL INFORMATION '
+*VWRITE,'!',' END OF NODAL INFORMATION '
+%C %30C
 
 *CFCLOSE  ! Close the File
 
