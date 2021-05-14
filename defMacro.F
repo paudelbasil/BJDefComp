@@ -34,8 +34,8 @@ nodeNum=1
 allsel
 
 ! NEED TO LOOP OVER ALL DATA SETS TO EXPORT
-SET,last
-set,prev
+SET,FIRST
+
 *DO,cntDS,numSets-1,numSets
 
 *do,nodeNum,minNode,maxNode
