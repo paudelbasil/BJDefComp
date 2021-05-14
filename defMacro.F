@@ -54,7 +54,7 @@ suz=UZ(nodeNum)
 *VWRITE,'Node','X','Y','Z','UX','UY', 'UZ'
 (7A10)
 *VWRITE, XPT(1,0),XPT(1,1),XPT(1,2),XPT(1,3),XPT(1,4),XPT(1,5),XPT(1,6)
-(1f9.1, 6f10.6)
+(1f9.1, 6f12.6)
 ! %G %G %G %G %G %G %G
 
 !/output
