@@ -7,14 +7,13 @@ defExport
 !         *ulib,defMacro,mac,
 !         *use, defMacro
 
+! DEFINE OUTPUT PARAMETERS
+fname='Results'
+
+! DO NOT CHANGE BELOW THIS LINE
 
 /post1
 set,last
-
-fname= arg1
-*if,fname,eq,0,then
-   fname='Results'
-*endif
 
 *MSG,UI 
 Exporting deformation results to Results.csv
