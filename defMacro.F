@@ -26,7 +26,7 @@ nodeNum=1
 allsel
 
 ! FIRST SETUP A TABLE
-*DIM, ExportedResults,TABLE, maxNode,6
+*DIM, XPT,TABLE, maxNode,6
 
 
 *do,nodeNum,minNode,maxNode
@@ -38,13 +38,13 @@ sux=UX(nodeNum)
 suy=UY(nodeNum)
 suz=UZ(nodeNum)
 
-*SET,ExportedResults(nodeNum,0),nodeNum
-*SET,ExportedResults(nodeNum,1),xx
-*SET,ExportedResults(nodeNum,2),yy
-*SET,ExportedResults(nodeNum,3),zz
-*SET,ExportedResults(nodeNum,4),sux
-*SET,ExportedResults(nodeNum,5),suy
-*SET,ExportedResults(nodeNum,6),suz
+*SET,XPT(nodeNum,0),nodeNum
+*SET,XPT(nodeNum,1),xx
+*SET,XPT(nodeNum,2),yy
+*SET,XPT(nodeNum,3),zz
+*SET,XPT(nodeNum,4),sux
+*SET,XPT(nodeNum,5),suy
+*SET,XPT(nodeNum,6),suz
 
 
 *enddo
@@ -54,7 +54,7 @@ suz=UZ(nodeNum)
 *CFOPEN,fname,'csv'           ! Open file for writing
 *VWRITE,'Node','X','Y','Z','UX','UY', 'UZ'
 (7A10)
-*VWRITE, ExportedResults(1,0),ExportedResults(1,1),ExportedResults(1,2),ExportedResults(1,3),ExportedResults(1,4),ExportedResults(1,5),ExportedResults(1,6)
+*VWRITE, XPT(1,0),XPT(1,1),XPT(1,2),XPT(1,3),XPT(1,4),XPT(1,5),XPT(1,6)
 (1f9.1, 6f10.6)
 ! %G %G %G %G %G %G %G
 
