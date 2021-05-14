@@ -31,7 +31,7 @@ Exporting deformation results to Results_T**.csv
 *DIM, XPT_N,ARRAY, maxNode
 
 nodeNum=1
-allsel
+ALLSEL
 
 ! NEED TO LOOP OVER ALL DATA SETS TO EXPORT
 SET,FIRST
@@ -80,7 +80,6 @@ fullfname = strcat(fname,fTime)
 
 *VWRITE, XPT_N(1),XPT(1,1),XPT(1,2),XPT(1,3)
 %9I%20.9G%20.9G%20.9G
-
 
 *CFWRITE,'-1'
 *CFWRITE,'! END OF NODAL INFORMATION '
