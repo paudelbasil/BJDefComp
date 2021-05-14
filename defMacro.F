@@ -1,14 +1,24 @@
+
+defExport
 ! Created by Basil J. Paudel            5/13/2021
 ! This macro will export the nodal coordinates and the deformation results
 !         to a CSV file
 ! Usage:
 !         *ulib,defMacro,mac,
 !         *use, defMacro
-defMacro
-/post26
+
+
+/post1
 set,last
 
-*MSG,UI, Exporting deformation results to Results.csv
+fname= arg1
+*if,fname,eq,0,then
+   fname='Results'
+*endif
+
+*MSG,UI 
+Exporting deformation results to Results.csv
+
 *GET, maxNode, NODE,0,NUM,MAX
 *GET, minNode, NODE,0,NUM,MIN
 
@@ -39,12 +49,17 @@ suz=UZ(nodeNum)
 
 *enddo
 
-/output, 'Results','csv','.'
+! NOT A PREFERRED OPTION, USE CFWRITE
+! /output, 'Results','csv','.'
+*CFOPEN,fname,'csv'           ! Open file for writing
 *VWRITE,'Node','X','Y','Z','UX','UY', 'UZ'
-%C, %C, %C, %C, %C, %C, %C
+(7A10)
 *VWRITE, ExportedResults(1,0),ExportedResults(1,1),ExportedResults(1,2),ExportedResults(1,3),ExportedResults(1,4),ExportedResults(1,5),ExportedResults(1,6)
-%G, %G, %G, %G, %G, %G, %G
-/output
+(1f9.1, 6f10.6)
+! %G %G %G %G %G %G %G
+
+!/output
+*CFCLOSE  ! Close the File
 
 
 /eof
