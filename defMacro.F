@@ -4,8 +4,9 @@ defExport
 ! This macro will export the nodal coordinates and the deformation results
 !         to a CSV file
 ! Usage:
-!         *ulib,defMacro,mac,
-!         *use, defMacro
+! First place the defMacro.F in the Ansys working directory
+!         *ulib,defMacro,F,
+!         *use, defExport
 
 ! DEFINE OUTPUT PARAMETERS
 fname='Results'
@@ -24,41 +25,39 @@ Exporting deformation results to Results.csv
 nodeNum=1
 allsel
 
-! FIRST SETUP A TABLE
-*DIM, XPT,TABLE, maxNode,6
-
+! FIRST SETUP A TABLE TO STORE DATA
+*DIM, XPT,TABLE, maxNode,3
 
 *do,nodeNum,minNode,maxNode
+
+! GET NODAL COORDINATES
 xx=NX(nodeNum)
 yy=NY(nodeNum)
 zz=NZ(nodeNum)
 
+! GET NODAL DISPLACEMENTS
 sux=UX(nodeNum)
 suy=UY(nodeNum)
 suz=UZ(nodeNum)
 
 *SET,XPT(nodeNum,0),nodeNum
-*SET,XPT(nodeNum,1),xx
-*SET,XPT(nodeNum,2),yy
-*SET,XPT(nodeNum,3),zz
-*SET,XPT(nodeNum,4),sux
-*SET,XPT(nodeNum,5),suy
-*SET,XPT(nodeNum,6),suz
+*SET,XPT(nodeNum,1),xx+sux
+*SET,XPT(nodeNum,2),yy+suy
+*SET,XPT(nodeNum,3),zz+suz
 
 
 *enddo
 
-! NOT A PREFERRED OPTION, USE CFWRITE
-! /output, 'Results','csv','.'
-*CFOPEN,fname,'csv'           ! Open file for writing
-*VWRITE,'Node','X','Y','Z','UX','UY', 'UZ'
-(7A10)
-*VWRITE, XPT(1,0),XPT(1,1),XPT(1,2),XPT(1,3),XPT(1,4),XPT(1,5),XPT(1,6)
-(1f9.1, 6f12.6)
-! %G %G %G %G %G %G %G
+! NOW WRITE TO FILE
 
-!/output
+*CFOPEN,fname,'csv'           ! Open file for writing
+*VWRITE,'Node','X','Y','Z'
+(4A10)
+*VWRITE, XPT(1,0),XPT(1,1),XPT(1,2),XPT(1,3)
+(1f9.1, 3f12.6)
+
 *CFCLOSE  ! Close the File
 
+! DONE EXPORTING
 
 /eof
