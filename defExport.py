@@ -27,15 +27,23 @@ def find_files(filename, search_path):
 def can_reject(tStep, lastTStep):
     if(lastTStep<-1):
         lastTStep=-1
-    newTStep =tStep//250       
+           
     if (tStep <800/5*60):
+        newTStep =tStep//250
         if(lastTStep==newTStep):
             return True,lastTStep
         else:
             lastTStep=newTStep
             return False,lastTStep
     else:
-        return False,newTStep
+        newTStep =tStep//250
+        if(lastTStep==newTStep):
+            lastTStep=newTStep
+            return True,lastTStep
+        else:
+            lastTStep=newTStep
+            return False,lastTStep
+        
 # End function definition
 
 
@@ -82,7 +90,7 @@ newPos = nodes  # Store original position
 lastTStep=-1
 
 # Now Iterate over time step
-rsets=range(0,rsetMax+1)
+rsets=range(1,rsetMax+1)
 for rset in rsets:      
     # Get corresponding time info
     tStep = result.solution_info(rset)['timfrq']
@@ -100,7 +108,9 @@ for rset in rsets:
     
     # Get nodal solutions, along with nodal numbers
     nodeNum, nodeDisp = result.nodal_displacement(rset)   # first set
-                                               
+    nodeNum, nodeTemp = result.nodal_temperature(rset)
+    isothermTemp = nodeTemp[1]                          # Nodal temp
+                                           
     newTable = []
     dofs=range(0,3)
     for j in nodeNum:
