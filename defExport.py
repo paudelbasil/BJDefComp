@@ -20,7 +20,23 @@ def find_files(filename, search_path):
       if filename in files:
          result.append(os.path.join(root, filename))
    return result
+# End def
 
+# Filter for exporting solutions
+#   Need to adjust criterio accordingly
+def can_reject(tStep, lastTStep):
+    if(lastTStep<-1):
+        lastTStep=-1
+    newTStep =tStep//250       
+    if (tStep <800/5*60):
+        if(lastTStep==newTStep):
+            return True,lastTStep
+        else:
+            lastTStep=newTStep
+            return False,lastTStep
+    else:
+        return False,newTStep
+# End function definition
 
 
 # Define variables and constants
@@ -63,12 +79,23 @@ nodes = result.mesh.nodes
 
 nodeCnt = len(nodes)
 newPos = nodes  # Store original position
+lastTStep=-1
 
 # Now Iterate over time step
 rsets=range(0,rsetMax+1)
 for rset in rsets:      
     # Get corresponding time info
     tStep = result.solution_info(rset)['timfrq']
+    
+    # Don't export too many solutions in early stage
+
+    cr,lastTStep = can_reject(tStep,lastTStep)
+    if(cr==True):
+        print("--Reject Load Set :%5i, tStep: %10.1f" % (rset, tStep))
+        continue                # Reject exporting this TimeStep
+    else:
+        print("++Accept Load Set :%5i, tStep: %10.1f" % (rset, tStep))
+        
     tStepStr = "%08.1f" % (tStep)
     
     # Get nodal solutions, along with nodal numbers
