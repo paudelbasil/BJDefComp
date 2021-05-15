@@ -25,10 +25,10 @@ def find_files(filename, search_path):
 
 # Define variables and constants
 workdir = 'E:\\Basil\\DefComp\\'
-path = "D:\\DATA_BJP\\Projects\\Combined_Coble_NV\\"
+path = "D:\\Basil\\WorkBench_Validation\\CD1\\Validation_CD1_Mar12_files\\dp0\\SYS\\MECH\\"
 
 # INPUT
-fname = "Combined_Coble_NVGB.rst"
+fname = "file.rst"
 fullnameInput = path+fname
 # path = os.getcwd()
 workdir = path
@@ -38,9 +38,10 @@ print(path)
 outputFile="Result_T"
 outputDir = workdir + "Results\\"
 try:
-    os.mkdir(outputDir)
+    if (os.path.exists(outputDir) == False):
+        os.mkdir(outputDir)
 except OSError as error:
-    print(error)
+    print('Error Creating folder')
     
 # mapdl = launch_mapdl("True", loglevel="WARNING")
 # Sample result file
@@ -55,7 +56,7 @@ rsetMax=result.nsets-1
 nnum,ndisp = result.nodal_displacement(rsetMax)
 
 # Plot nodal solution
-result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True)
+# result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True)
 
 # Get nodes original position
 nodes = result.mesh.nodes
@@ -74,8 +75,10 @@ for rset in rsets:
     nodeNum, nodeDisp = result.nodal_displacement(rset)   # first set
                                                
     newTable = []
+    dofs=range(0,3)
     for j in nodeNum:
-        newPos[j-1]=nodes[j-1]+nodeDisp[j-1]
+        for i in dofs:
+            newPos[j-1,i]=nodes[j-1,i]+nodeDisp[j-1,i]
         newNode=[j,newPos[j-1,0],newPos[j-1,1],newPos[j-1,2]]
         newTable.insert(j-1, newNode)
         
@@ -90,7 +93,7 @@ for rset in rsets:
     print("(1i9,3e20.9e3)",file=f)
     
     for j in nodeNum:
-        print("%9i %20.9E%20.9E%20.9E" % (j,newPos[j-1,0],newPos[j-1,1],newPos[j-1,2]),file=f)
+        print("%9i%20.9E%20.9E%20.9E" % (j,newPos[j-1,0],newPos[j-1,1],newPos[j-1,2]),file=f)
         
     print("-1",file=f)
     print("! ====================================================================",file=f)
