@@ -8,8 +8,8 @@ import os
 from array import *
 
 #from ansys.mapdl.core import launch_mapdl
-from ansys.mapdl import reader as Reader
-#from ansys.dpf.core import Model
+#from ansys.mapdl import reader as Reader
+from ansys.dpf.core import Model
 
 
 def find_files(filename, search_path):
@@ -28,15 +28,39 @@ def can_reject(tStep, lastTStep):
     if(lastTStep<-1):
         lastTStep=-1
            
-    if (tStep <800/5*60):
-        newTStep =tStep//250
+    if (tStep <800/5*60 or tStep > (1350/5*60+4*3600)):
+        newTStep =tStep//500
         if(lastTStep==newTStep):
             return True,lastTStep
         else:
             lastTStep=newTStep
             return False,lastTStep
-    else:
+    elif (tStep < (1250/5*60)):
         newTStep =tStep//250
+        if(lastTStep==newTStep):
+            lastTStep=newTStep
+            return True,lastTStep
+        else:
+            lastTStep=newTStep
+            return False,lastTStep
+    elif (tStep < (1350/5*60+1*3600)):
+        newTStep =tStep//50
+        if(lastTStep==newTStep):
+            lastTStep=newTStep
+            return True,lastTStep
+        else:
+            lastTStep=newTStep
+            return False,lastTStep
+    elif (tStep < (1350/5*60+4*3600)):
+        newTStep =tStep//250
+        if(lastTStep==newTStep):
+            lastTStep=newTStep
+            return True,lastTStep
+        else:
+            lastTStep=newTStep
+            return False,lastTStep
+    else:
+        newTStep =tStep//500
         if(lastTStep==newTStep):
             lastTStep=newTStep
             return True,lastTStep
@@ -61,6 +85,8 @@ print(path)
 # OUTPUT
 outputFile="Result_T"
 outputDir = workdir + "Results\\"
+# Directly output to OneDrive
+outputDir = "D:\\Basil\\OneDrive - University of Pittsburgh\\Shared\\Hao\\BinderJet Distortion Data\\SimulationTimeHistory2\\"
 try:
     if (os.path.exists(outputDir) == False):
         os.mkdir(outputDir)
@@ -73,7 +99,17 @@ rstfile = fullnameInput
 
 # Create result object by loading the result file
 # Working with result after simulation
-result = Reader.read_binary(rstfile)
+#result = Reader.read_binary(rstfile)  # Using Reader
+
+# Get result using dpf
+mdl = Model(rstfile)
+rslt = mdl.results
+disp = rslt.displacement()
+fldC = disp.outputs.fields_container()
+fld = fldC[0]                    
+result = mdl.results
+
+
 rsetMax=result.nsets-1
 
 # Get nodal displacements
@@ -90,7 +126,10 @@ newPos = nodes  # Store original position
 lastTStep=-1
 
 # Now Iterate over time step
-rsets=range(1,rsetMax+1)
+start = 1
+rsets=range(rsetMax-5,rsetMax+1)
+
+
 for rset in rsets:      
     # Get corresponding time info
     tStep = result.solution_info(rset)['timfrq']
@@ -110,12 +149,15 @@ for rset in rsets:
     nodeNum, nodeDisp = result.nodal_displacement(rset)   # first set
     nodeNum, nodeTemp = result.nodal_temperature(rset)
     isothermTemp = nodeTemp[1]                          # Nodal temp
-                                           
+    # Length factor from solution
+    lfact = result.solution_info(rset)['lfactn']
+    print(lfact)
+                                   
     newTable = []
     dofs=range(0,3)
     for j in nodeNum:
         for i in dofs:
-            newPos[j-1,i]=nodes[j-1,i]+nodeDisp[j-1,i]
+            newPos[j-1,i]=nodes[j-1,i] +nodeDisp[j-1,i]
         newNode=[j,newPos[j-1,0],newPos[j-1,1],newPos[j-1,2]]
         newTable.insert(j-1, newNode)
         
