@@ -8,8 +8,8 @@ import os
 from array import *
 
 #from ansys.mapdl.core import launch_mapdl
-#from ansys.mapdl import reader as Reader
-from ansys.dpf.core import Model
+from ansys.mapdl import reader as Reader
+#from ansys.dpf.core import Model
 
 
 def find_files(filename, search_path):
@@ -86,7 +86,7 @@ print(path)
 outputFile="Result_T"
 outputDir = workdir + "Results\\"
 # Directly output to OneDrive
-outputDir = "D:\\Basil\\OneDrive - University of Pittsburgh\\Shared\\Hao\\BinderJet Distortion Data\\SimulationTimeHistory2\\"
+outputDir = "D:\\Basil\\OneDrive - University of Pittsburgh\\Shared\\Hao\\BinderJet Distortion Data\\SimulationTimeHistory\\"
 try:
     if (os.path.exists(outputDir) == False):
         os.mkdir(outputDir)
@@ -99,15 +99,15 @@ rstfile = fullnameInput
 
 # Create result object by loading the result file
 # Working with result after simulation
-#result = Reader.read_binary(rstfile)  # Using Reader
+result = Reader.read_binary(rstfile)  # Using Reader
 
 # Get result using dpf
-mdl = Model(rstfile)
-rslt = mdl.results
-disp = rslt.displacement()
-fldC = disp.outputs.fields_container()
-fld = fldC[0]                    
-result = mdl.results
+#mdl = Model(rstfile)
+##rslt = mdl.results
+#disp = rslt.displacement()
+#fldC = disp.outputs.fields_container()
+#fld = fldC[0]                    
+#result = mdl.results
 
 
 rsetMax=result.nsets-1
@@ -127,8 +127,9 @@ lastTStep=-1
 
 # Now Iterate over time step
 start = 1
-rsets=range(rsetMax-5,rsetMax+1)
+rsets=range(1,rsetMax+1,10)
 
+doCombined = True
 
 for rset in rsets:      
     # Get corresponding time info
@@ -149,30 +150,32 @@ for rset in rsets:
     nodeNum, nodeDisp = result.nodal_displacement(rset)   # first set
     nodeNum, nodeTemp = result.nodal_temperature(rset)
     isothermTemp = nodeTemp[1]                          # Nodal temp
-    # Length factor from solution
-    lfact = result.solution_info(rset)['lfactn']
-    print(lfact)
-                                   
-    newTable = []
-    dofs=range(0,3)
-    for j in nodeNum:
-        for i in dofs:
-            newPos[j-1,i]=nodes[j-1,i] +nodeDisp[j-1,i]
-        newNode=[j,newPos[j-1,0],newPos[j-1,1],newPos[j-1,2]]
-        newTable.insert(j-1, newNode)
-        
+    # Load factor from solution
+    #lfact = result.solution_info(rset)['lfactn']
+    #print(lfact)
+                                  
+       
     # Using info https://www.w3schools.com/python/python_file_write.asp 
     fullname=outputDir+outputFile+"_"+ tStepStr +".csv"
     f=open(fullname,"w")  
     
     print("%s %68s" % ('!',"Nodal Information Dump"),file=f)
     print("%s %58s%10i" % ('!',"Total Nodes =", nodeCnt),file=f)
-    print("%s%9s%20s%20s%20s" % ('!',"Node","X","Y","Z"),file=f)
-    print("nblock,3,,%i" % (nodeCnt),file=f)
-    print("(1i9,3e20.9e3)",file=f)
+    if(doCombined):
+        print("%s%9s%20s%20s%20s" % ('!',"Node","X","Y","Z"),file=f)
+        print("nblock,3,,%i" % (nodeCnt),file=f)
+        print("(1i9,3e20.9e3)",file=f)
     
+    else:
+        print("%s%9s%20s%20s%20s%20s%20s%20s" % ('!',"Node","X","Y","Z","UX","UY","UZ"),file=f)
+        print("nblock,3,,%i" % (nodeCnt),file=f)
+        print("(1i9,6e20.9e3)",file=f)
+        
     for j in nodeNum:
-        print("%9i%20.9E%20.9E%20.9E" % (j,newPos[j-1,0],newPos[j-1,1],newPos[j-1,2]),file=f)
+        if(doCombined):
+            print("%9i%20.9E%20.9E%20.9E" % (j,nodes[j-1,0]+nodeDisp[j-1,0],nodes[j-1,1]+nodeDisp[j-1,1],nodes[j-1,2]+nodeDisp[j-1,2]),file=f)
+        else:
+            print("%9i%20.9E%20.9E%20.9E%20.9E%20.9E%20.9E" % (j,nodes[j-1,0],nodes[j-1,1],nodes[j-1,2],nodeDisp[j-1,0],nodeDisp[j-1,1],nodeDisp[j-1,2]),file=f)
         
     print("-1",file=f)
     print("! ====================================================================",file=f)
