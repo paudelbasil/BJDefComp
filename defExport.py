@@ -29,7 +29,7 @@ def can_reject(tStep, lastTStep):
         lastTStep=-1
            
     if (tStep <800/5*60 or tStep > (1350/5*60+4*3600)):
-        newTStep =tStep//500
+        newTStep =tStep//1000
         if(lastTStep==newTStep):
             return True,lastTStep
         else:
@@ -52,7 +52,7 @@ def can_reject(tStep, lastTStep):
             lastTStep=newTStep
             return False,lastTStep
     elif (tStep < (1350/5*60+4*3600)):
-        newTStep =tStep//250
+        newTStep =tStep//500
         if(lastTStep==newTStep):
             lastTStep=newTStep
             return True,lastTStep
@@ -60,7 +60,7 @@ def can_reject(tStep, lastTStep):
             lastTStep=newTStep
             return False,lastTStep
     else:
-        newTStep =tStep//500
+        newTStep =tStep//1000
         if(lastTStep==newTStep):
             lastTStep=newTStep
             return True,lastTStep
@@ -85,8 +85,11 @@ print(path)
 # OUTPUT
 outputFile="Result_T"
 outputDir = workdir + "Results\\"
+
 # Directly output to OneDrive
 outputDir = "D:\\Basil\\OneDrive - University of Pittsburgh\\Shared\\Hao\\BinderJet Distortion Data\\SimulationTimeHistory\\"
+outputDir = "D:\\Basil\\OneDrive - University of Pittsburgh\\Shared\\Hao\\BinderJet Distortion Data\\IT0_Results\\"
+outputDir = "D:\\Basil\\Deformation_Comp\\Hao\\CD1\\IT0_1\\"
 try:
     if (os.path.exists(outputDir) == False):
         os.mkdir(outputDir)
@@ -126,10 +129,11 @@ newPos = nodes  # Store original position
 lastTStep=-1
 
 # Now Iterate over time step
-start = 1
-rsets=range(1,rsetMax+1,10)
+start = rsetMax
+rsets=range(start,rsetMax+1,5)
 
 doCombined = True
+compFactor = -0.7       # To get deformed shape, use +1.
 
 for rset in rsets:      
     # Get corresponding time info
@@ -173,7 +177,7 @@ for rset in rsets:
         
     for j in nodeNum:
         if(doCombined):
-            print("%9i%20.9E%20.9E%20.9E" % (j,nodes[j-1,0]+nodeDisp[j-1,0],nodes[j-1,1]+nodeDisp[j-1,1],nodes[j-1,2]+nodeDisp[j-1,2]),file=f)
+            print("%9i%20.9E%20.9E%20.9E" % (j,nodes[j-1,0]+compFactor*nodeDisp[j-1,0],nodes[j-1,1]+compFactor*nodeDisp[j-1,1],nodes[j-1,2]+compFactor*nodeDisp[j-1,2]),file=f)
         else:
             print("%9i%20.9E%20.9E%20.9E%20.9E%20.9E%20.9E" % (j,nodes[j-1,0],nodes[j-1,1],nodes[j-1,2],nodeDisp[j-1,0],nodeDisp[j-1,1],nodeDisp[j-1,2]),file=f)
         
