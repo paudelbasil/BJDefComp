@@ -168,6 +168,22 @@ def GetNodalData_Result(result, factor=1.0):
         
     return nodalData
 
+def PlotNodalSolution(rstfile, step=-1, readFromFile=True):
+    if(readFromFile):
+        # Create result object by loading the result file
+        # Working with result after simulation
+        result = Reader.read_binary(rstfile)  # Using Reader
+    else:
+        result = rstfile
+
+    if(step<0):
+        rsetMax=result.nsets-1
+    else:
+        rsetMax = step
+        
+    # Plot nodal solution
+    return result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True)
+    
 
 def GetNodalData(file):
     # import pandas as pd
