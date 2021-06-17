@@ -52,11 +52,8 @@ def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
         SaveNodalInfo(result, 'nodalData.inp', wdir, 0, False)
     
     print('>>> Iteration completed. ---')
-        
-        
-        
-        
 
+    
 def CompareNodes(target, current):
     # Both data structure are [N, X, Y, Z]
     nodes = target[0]
@@ -80,9 +77,25 @@ def CompareNodes(target, current):
     
     print("Max Nodal Diff: %10f Residual Error: %10f" % (nodalMax, globalMax))
     return [nodalMax, globalMax]
-                     
 
-def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True):
+def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
+    if(readFromFile):
+        # Create result object by loading the result file
+        # Working with result after simulation
+        result = Reader.read_binary(rstfile)  # Using Reader
+    else:
+        result = rstfile
+
+    rsetMax = result.nsets
+
+    loads = range(0,rsetMax,10)
+    
+    for ld in loads:
+        SaveNodalInfo(rstfile, outFile, wdir,factor,readFromFile, ld, True)
+        print('--- Step %i written.' % ld)
+
+
+def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-1, appendTimeStamp=False):
     
     if(readFromFile):
         # Create result object by loading the result file
@@ -90,8 +103,11 @@ def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True):
         result = Reader.read_binary(rstfile)  # Using Reader
     else:
         result = rstfile
-        
-    rsetMax=result.nsets-1
+
+    if(step<0):    
+        rsetMax=result.nsets-1
+    else:
+        rsetMax = step
     
     # Get nodal displacements
     nnum,ndisp = result.nodal_displacement(rsetMax)
@@ -116,6 +132,10 @@ def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True):
     nodeNum, nodeTemp = result.nodal_temperature(rset)
     isothermTemp = nodeTemp[1]                          # Nodal temp
     
+    if (appendTimeStamp):
+        filePref, fileExt = SplitFileName(outFile)
+        outFile = filePref + '_T_' + tStepStr + '.' + fileExt
+
     # Using info https://www.w3schools.com/python/python_file_write.asp 
     fullname= wdir + outFile
     f=open(fullname,"w")  
@@ -193,6 +213,12 @@ def GetNodalData(file):
 
 def FullPath(file, wdir):
     return wdir + file
+
+def SplitFileName(fname):
+    fileExt = fname.split(".")[-1]
+    fileName = fname.split('.'+fileExt)[0]
+    return [fileName, fileExt]
+
 
 def PlotPoints(point3d, v1=0,v2=0):
     ax = plt.axes(projection='3d')
