@@ -92,7 +92,7 @@ def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
     
     for ld in loads:
         SaveNodalInfo(rstfile, outFile, wdir,factor,readFromFile, ld, True)
-        print('--- Step %i written.' % ld)
+        print('--- Step %i of %i written.' % (ld, rsetMax))
 
 
 def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-1, appendTimeStamp=False):
