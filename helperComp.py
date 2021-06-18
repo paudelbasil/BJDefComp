@@ -10,6 +10,7 @@ import shutil
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pyvista as pv
 
 from ansys.mapdl.core import launch_mapdl
 from ansys.mapdl import reader as Reader
@@ -80,6 +81,9 @@ def CompareNodes(target, current):
 
 def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
     if(readFromFile):
+        if(os.path.exists(rstfile)==False):
+            print('File does NOT exist.')
+            return None
         # Create result object by loading the result file
         # Working with result after simulation
         result = Reader.read_binary(rstfile)  # Using Reader
@@ -88,12 +92,19 @@ def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
 
     rsetMax = result.nsets
 
-    loads = range(0,rsetMax,10)
+    loads = range(0,rsetMax-1,10)
     
     for ld in loads:
         SaveNodalInfo(rstfile, outFile, wdir,factor,readFromFile, ld, True)
-        print('--- Step %i of %i written.' % (ld, rsetMax))
-
+        print('--- Step %i of %i written.' % (ld, rsetMax-1))
+    
+    # Export the Final solution
+    if((rsetMax-ld)>1):
+        SaveNodalInfo(rstfile, outFile, wdir,factor,readFromFile, rsetMax-1, True)
+        print('--- Step %i of %i written.' % (rsetMax-1, rsetMax-1))
+    
+    return None
+     
 
 def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-1, appendTimeStamp=False):
     
@@ -202,8 +213,8 @@ def PlotNodalSolution(rstfile, step=-1, readFromFile=True):
         rsetMax = step
         
     # Plot nodal solution
-    return result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True)
-    
+    result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True, notebook=False, window_size=[512,384])
+    return result
 
 def GetNodalData(file):
     # import pandas as pd
