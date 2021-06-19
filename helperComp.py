@@ -19,13 +19,19 @@ from ansys.mapdl import reader as Reader
 ### EXPORT GEOMETRY FROM LAST SOLUTION
 def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
     itn = 0 
-    residualError, nodalError    = 1e6,1e6
+    
+    aggression = 0.9    # > 1 means faster approach, <1 mean slow approach
+    
+    # Step : 0 : Initial Values
+    residualError, nodalError    = 1.0, 1.0
+    lastResidlErr, lastNodErr    = 1.0, 1.0
+    oldFactor, scaleFactor       = 0.0, 0.0
     
     ## ITERATION LOOP
     while(residualError >errTol and nodalError > errTol and itn<maxItn):
-        print(">>> Iteration loop : %i" % itn)
+        print(">>> Iteration loop : %i, scale factor: %f" % (itn,scaleFactor))
         nodalFileIt = 'COMP_RSLT_IT_%i.csv' % itn 
-        # Run the simulation
+        # Step: 1 : Run the simulation
         mapdl.clear()
         mapdl.input(wdir+mainFile, verbose=False)
         mapdl.finish()
@@ -36,13 +42,25 @@ def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
         
         # current = GetNodalData(nodalFileIt)
         current = GetNodalData_Result(result, 1.0)
-        # Check Error
-        nodalError, residualError = CompareNodes(target, current)
         
+        # Step : 2 : Calculate Error
+        nodalError, residualError = CompareNodes(target, current)
+                
+        # Step : 3 : Calculate new scaleFactor
+        if(itn==0):
+            lastResidlErr, oldFactor = residualError, scaleFactor
+            scaleFactor = 1.0
+            
+        else:
+            dEdF = (residualError - lastResidlErr)/(scaleFactor-oldFactor)        
+            lastResidlErr, oldFactor = residualError, scaleFactor
+            scaleFactor = oldFactor+ (residualError-errTol)/dEdF*aggression
+            
+            
         # Compensate geom
         SaveNodalInfo(result, nodalFileIt, wdir, 1, False) # Save History
-        SaveNodalInfo(result, 'nodalData.inp', wdir, -0.95, False)
-    
+        SaveNodalInfo(result, 'nodalData.inp', wdir, -scaleFactor, False)
+        
     # Check if converged
     if(itn>=maxItn):
         # Not Converged
