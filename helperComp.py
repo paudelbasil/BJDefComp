@@ -24,20 +24,38 @@ def getTime():
 
 # Calls APDL and runs the simulation, return result object
 def RunSimulation(mapdl, wdir, mainFile):
-    print('>>> Simulation started on : ' + getTime())
+    '''
+    
+
+    Parameters
+    ----------
+    mapdl : ansys.mapdl
+        ansys.mapdl object.
+    wdir : string
+        working directory for mapdl.
+    mainFile : TYPE
+        main input file for mapdl.
+
+    Returns
+    -------
+    out : TYPE
+        DESCRIPTION.
+
+    '''
+    ShowMsg(' Simulation started on : ' + getTime())
     mapdl.clear()
-    mapdl.input(wdir+mainFile, verbose= False)
+    mapdl.input(FullPath(mainFile,wdir), verbose= False)
     mapdl.finish
     out = mapdl.result
-    print('>>> Simulation completed on : ' + getTime())
+    ShowMsg(' Simulation completed on : ' + getTime())
     
     return out
 
 def CreateInput(wdir, simZeroFile, compFactor, outNodeFile):
-    allResult = GetNodalData(wdir + simZeroFile)
+    allResult = GetNodalData(FullPath(simZeroFile, wdir))
     
     nodeCnt = len(allResult)
-    outputFile = wdir + outNodeFile
+    outputFile = FullPath(outNodeFile, wdir)
     
     f=open(outputFile,"w")  
     
@@ -51,7 +69,10 @@ def CreateInput(wdir, simZeroFile, compFactor, outNodeFile):
     nodes = allResult[:,1:4]
     nodeDisp = allResult[:,4:7]    
     for j in range(1,nodeCnt+1):
-        print("%9i%20.9E%20.9E%20.9E" % (j,nodes[j-1,0]+compFactor*nodeDisp[j-1,0],nodes[j-1,1]+compFactor*nodeDisp[j-1,1],nodes[j-1,2]+compFactor*nodeDisp[j-1,2]),file=f)
+        print("%9i%20.9E%20.9E%20.9E" % 
+              (j, nodes[j-1,0]+compFactor*nodeDisp[j-1,0],
+               nodes[j-1,1]+compFactor*nodeDisp[j-1,1],
+               nodes[j-1,2]+compFactor*nodeDisp[j-1,2]),file=f)
         
     print("-1",file=f)
     print("! ====================================================================",file=f)
@@ -63,16 +84,22 @@ def CreateInput(wdir, simZeroFile, compFactor, outNodeFile):
 ### Use scipy.optimize to minimize
 # First create a objective function to simplify the iterator
 def Objective(inputX, mapdl, wdir, mainFile, simZeroResult, target):
-    print(".")
-    print(">>> Iteration input Scale factor: %f" % (inputX))
+    ShowMsg(".",2)
+    ShowMsg("Iteration input Scale factor: %f" % (inputX))
     nodalFileName = 'nodalData_IT.inp'
-    nodalFileIt = 'COMP_RSLT_IT_%f.csv' % np.round(inputX,2) 
+    nodalFileIt = 'COMP_RSLT_IT_%f.csv' % np.round(inputX,4) 
     
-    if(os.path.exists(wdir+nodalFileIt)==False):
+    # Create compensated input file for the prescribed scale
+    # SaveNodalInfo(dispZero, nodalFileName, wdir, -inputX, False)
+    CreateInput(wdir, simZeroResult, -inputX, nodalFileName)
+    
+    #print(' -- IN -- ' )
+    # inPoints = GetNodalData(FullPath(nodalFileName, wdir))
+    # PlotPoints(inPoints, None, 180, -90)
+
+    if(os.path.exists(FullPath(nodalFileIt,wdir))==False):
         # Step: 1 : Run the simulation
-        # Create compensated input file for the prescribed scale
-        # SaveNodalInfo(dispZero, nodalFileName, wdir, -inputX, False)
-        CreateInput(wdir, simZeroResult, -inputX, nodalFileName)
+        
         # Run the simulation for prescribed scaleFactor
         result = RunSimulation(mapdl, wdir, mainFile)      # Same Result Object as the Reader class
         # Save simulation result
@@ -81,9 +108,15 @@ def Objective(inputX, mapdl, wdir, mainFile, simZeroResult, target):
         current = GetNodalData_Result(result, 1.0)
     else:
         # Simulation results already exists, so retrieve from storage
-        current = GetNodalData(wdir + nodalFileIt)
-        print('***  Using data from previously saved file.')
+        current = GetNodalData(FullPath(nodalFileIt,wdir))
+        ShowMsg(' Using data from previously saved file.',3)
         
+    # Plot initial and final
+    
+    # print(' -- OUT -- ' )
+    # plt.subplot(1,2,2)
+    # outPoints = GetNodalData(FullPath(nodalFileIt, wdir))
+    # PlotPoints(outPoints,None, 180, -90)
     
     # Step : 2 : Calculate Error
     nodalError, residualError = CompareNodes(target, current)
@@ -96,56 +129,88 @@ def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
     
     # Do initial simulation
     simZeroResult = 'RESULT_IT0.csv'
-    if(os.path.exists(wdir+simZeroResult)==False):
+    if(os.path.exists(FullPath(simZeroResult,wdir))==False):
+        
         rslt = RunSimulation(mapdl, wdir, 'mainInputBox0.dat')
         SaveNodalInfo(rslt, simZeroResult, wdir, readFromFile=False, doCombined=False)
     else:
-        print('*** Using a previously saved copy.')
+        ShowMsg(' Using a previously saved copy.',3)
         
     # Call the scipy minimizer
     initialScale = 1
-    result = minimize(Objective, initialScale, (mapdl, wdir, mainFile, simZeroResult, target), method='L-BFGS-B')
+    
+    # DOCS: https://docs.scipy.org/doc/scipy/reference/tutorial/optimize.html#unconstrained-minimization-of-multivariate-scalar-functions-minimize
+    # Use NON-Gradient based iterative algorithm
+    # Options: xatol (absolute tolerance in x)
+    result = minimize(Objective, initialScale, 
+                      (mapdl, wdir, mainFile, simZeroResult, target), 
+                      method='nelder-mead',
+                      options={'maxiter': maxItn, 'xatol': errTol,
+                               'disp':True})
     
     # Summarize the result
-    print('Status : %s' % result['message'])
-    print('Total Iterations : %d' % result['nfev'])
+    ShowMsg('------------------------------------------------------',-1)
+    ShowMsg('Status : %s' % result['message'],2)
+    ShowMsg('Total Iterations : %d' % result['nfev'],2)
+    ShowMsg('------------------------------------------------------',-1)
     
     # evaluate solution
-    solution = result['x']
+    # solution = result['x']
     # evaluation = objective(solution)
-    print('Solution: f(%s)' % (solution))
-    
-    print('>>> Iteration completed. ---')
+    #print('Solution: f(%s)' % (solution))
+    ShowMsg('Iteration completed. ---')
     
     
 def CompareNodes(target, current):
+    '''
+    
+
+    Parameters
+    ----------
+    target : TYPE
+        Item 1 to compare.
+    current : TYPE
+        Item 2 to compare.
+
+    Returns
+    -------
+    list
+        [nodalMax, globalMax].
+
+    '''
     # Both data structure are [N, X, Y, Z]
-    nodes = target[0]
+    nodes = target[:]
     nodeCount  = len(nodes)
+    ShowMsg('Rows count : %d, Cols count : %d' % (nodeCount,len(target[0])))
+    
     nodalDist = nodeCount * [0]
     
-    nodalMax, globalMax = 0,0 
+    nodalMax, globalMax = 0.0,0.0 
     
     for nodeid in range(nodeCount):
-        dx = target[1][nodeid] - current[1][nodeid]
-        dy = target[2][nodeid] - current[2][nodeid]
-        dz = target[3][nodeid] - current[3][nodeid]
+        dx = target[nodeid][1] - current[nodeid][1]
+        dy = target[nodeid][2] - current[nodeid][2]
+        dz = target[nodeid][3] - current[nodeid][3]
         dist = (dx**2+dy**2+dz**2)**0.5
-        nodalDist[nodeid-1] = dist
+        nodalDist[nodeid] = dist
         nodalMax = max(nodalMax, dist)
         globalMax = globalMax + dist**2
     
     # Normalize globalMax
     globalMax = globalMax**(0.5)
-    globalMax = globalMax/nodeCount
+    globalMax = globalMax
     
-    print("Max Nodal Diff: %10f Residual Error: %10f" % (nodalMax, globalMax))
+    ShowMsg("Max Nodal Diff: %10f Residual Error: %10f" % (nodalMax, globalMax),3)
+    
+    print([np.shape(current), np.shape(target)])
+    
+    PlotPoints(current, nodalDist,180,-90)
     return [nodalMax, globalMax]
 
 def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
     if(readFromFile):
         if(os.path.exists(rstfile)==False):
-            print('File does NOT exist.')
+            ShowMsg('File does NOT exist.')
             return None
         # Create result object by loading the result file
         # Working with result after simulation
@@ -159,12 +224,12 @@ def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
     
     for ld in loads:
         SaveNodalInfo(rstfile, outFile, wdir,factor,readFromFile, ld, True)
-        print('--- Step %i of %i written.' % (ld, rsetMax-1))
+        ShowMsg('Step %i of %i written.' % (ld, rsetMax-1), 1)
     
     # Export the Final solution
     if((rsetMax-ld)>1):
         SaveNodalInfo(rstfile, outFile, wdir,factor,readFromFile, rsetMax-1, True)
-        print('--- Step %i of %i written.' % (rsetMax-1, rsetMax-1))
+        ShowMsg('Step %i of %i written.' % (rsetMax-1, rsetMax-1), 1)
     
     return None
      
@@ -211,7 +276,7 @@ def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-
         outFile = filePref + '_T_' + tStepStr + '.' + fileExt
 
     # Using info https://www.w3schools.com/python/python_file_write.asp 
-    fullname= wdir + outFile
+    fullname= FullPath(outFile, wdir) 
     f=open(fullname,"w")  
     
     print("%s %68s" % ('!',"Nodal Information Dump"),file=f)
@@ -238,6 +303,22 @@ def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-
     return True
 
 def GetNodalData_Result(result, factor=1.0):
+    '''
+    
+
+    Parameters
+    ----------
+    result : mapdl.result
+        Result object from mapdl.
+    factor : float, optional
+        Scaling for displacement. The default is 1.0.
+
+    Returns
+    -------
+    nodalData : array(array())
+        Nodal data from the mapdl.result with scaled displacments.
+
+    '''
     rsetMax=result.nsets-1
     
     # Get nodal displacements
@@ -260,9 +341,28 @@ def GetNodalData_Result(result, factor=1.0):
     for j in range(nodeCnt):
         nodalData[j]= [j+1, nodes[j-1,0]+compFactor*nodeDisp[j-1,0], nodes[j-1,1]+compFactor*nodeDisp[j-1,1], nodes[j-1,2]+compFactor*nodeDisp[j-1,2] ]
         
-    return nodalData
+    # Return 2D array instead of list of list
+    return np.array(nodalData)
 
 def PlotNodalSolution(rstfile, step=-1, readFromFile=True):
+    '''
+    
+
+    Parameters
+    ----------
+    rstfile : TYPE
+        Either filepath of 'rst' or the result object variable.
+    step : TYPE, optional
+        DESCRIPTION. The default is -1.
+    readFromFile : bool, optional
+        If set to False, rstfile is 'mapdl.result' object. The default is True.
+
+    Returns
+    -------
+    result : PyVista.pyplot
+        Plot of nodal deformation.
+
+    '''
     if(readFromFile):
         # Create result object by loading the result file
         # Working with result after simulation
@@ -279,31 +379,129 @@ def PlotNodalSolution(rstfile, step=-1, readFromFile=True):
     result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True, notebook=False, window_size=[512,384])
     return result
 
+def PlotPoints2(nodes):
+    
+    ptCloud = nodes[:,1:4]  # Disregard the first column (nodeIDs)
+    pc = pv.PolyData(ptCloud)
+    pc.plot(background='w',notebook=False,render_points_as_spheres=True,
+            eye_dome_lighting=True, window_size=[512,384], parallel_projection=True)
+    return pc
+
+
 def GetNodalData(file):
+    '''
+    
+
+    Parameters
+    ----------
+    file : str
+        Full file path of the csv file.
+
+    Returns
+    -------
+    dfarray : array(array())
+        Table of Nodal location [[node, x, y, z],].
+
+    '''
     # import pandas as pd
-    df = pd.read_csv(file, engine="python", skiprows=5, skipfooter=1, comment='!', sep='\s+', skipinitialspace=True, header=None)
+    df = pd.read_csv(file, engine="python", skiprows=5, skipfooter=2, 
+                     comment='!', sep='\s+', skipinitialspace=True, 
+                     header=None)
     dfarray = df.values
     return dfarray
 
 def FullPath(file, wdir):
+    '''
+    
+
+    Parameters
+    ----------
+    file : str
+        Full file path (excluding dir).
+    wdir : TYPE
+        Directory with/without closing backslash.
+
+    Returns
+    -------
+    TYPE
+        Full file path (with dir).
+
+    '''
+    if(wdir[-1] != "\\"):
+        wdir = wdir + "\\"
     return wdir + file
 
 def SplitFileName(fname):
+    '''
+    
+
+    Parameters
+    ----------
+    fname : Str
+        filename (without directory).
+
+    Returns
+    -------
+    list
+        [name, ext].
+
+    '''
     fileExt = fname.split(".")[-1]
     fileName = fname.split('.'+fileExt)[0]
     return [fileName, fileExt]
 
 
-def PlotPoints(point3d, v1=0,v2=0):
-    ax = plt.axes(projection='3d')
+def PlotPoints(point3d, cdata=None, v1=0,v2=0, ax = None):
+    """    
+
+    Parameters
+    ----------
+    point3d : TYPE
+        [[id, x, y, z],...].
+    v1 : TYPE, optional
+        Viewer - X rotation . The default is 0.
+    v2 : TYPE, optional
+        Viewer - Y rotation. The default is 0.
+
+    Returns
+    -------
+    Static Matplotlib Plot .
+
+    """
+    
+    if(ax==None):
+        ax = plt.axes(projection='3d')
     
     # 0 : Node Number
     xdata = point3d[:,1]
     ydata = point3d[:,2]
     zdata = point3d[:,3]
-    cdata = xdata+ydata+zdata
-    ax.scatter3D(xdata, ydata, zdata, c=cdata, cmap='inferno')
+    
+    if(cdata==None):
+        cdata = xdata+ydata+zdata
+    
+    pp=ax.scatter3D(xdata, ydata, zdata, c=cdata, cmap='jet', marker=',')
     ax.view_init(v1, v2)
     ax.grid(False)
+    ax.set_proj_type('ortho')
+    plt.axis('off')
+    plt.colorbar(pp)
+    plt.show()
+    return ax
+
+
     
+def ShowMsg(msg='', level=0):
+    if(level == 0):
+        print('>>> ' + str(msg))
+    elif(level == 1):
+        print('--- ' + str(msg))
+    elif(level == 2):
+        print('\t ' + str(msg))
+    elif(level == 3):
+        print('*** ' + str(msg))
+    else:
+        print(' -----------------------------------------------------')
     
+    return None
+
