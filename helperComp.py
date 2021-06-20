@@ -11,18 +11,25 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pyvista as pv
+import time
 
 from scipy.optimize import minimize
 from ansys.mapdl.core import launch_mapdl
 from ansys.mapdl import reader as Reader
 
 
+def getTime():
+    ltime = time.localtime(time.time())
+    return time.asctime(ltime)
+
 # Calls APDL and runs the simulation, return result object
 def RunSimulation(mapdl, wdir, mainFile):
+    print('>>> Simulation started on : ' + getTime())
     mapdl.clear()
     mapdl.input(wdir+mainFile, verbose= False)
     mapdl.finish
     out = mapdl.result
+    print('>>> Simulation completed on : ' + getTime())
     
     return out
 
@@ -68,7 +75,7 @@ def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
     
     # Call the scipy minimizer
     initialScale = 1
-    result = minimize(Objective, initialScale, (mapdl, wdir, mainFile, target), method='L-BFGS-B')
+    result = minimize(Objective, initialScale, (mapdl, wdir, mainFile, simZero, target), method='L-BFGS-B')
     
     # Summarize the result
     print('Status : %s' % result['message'])
