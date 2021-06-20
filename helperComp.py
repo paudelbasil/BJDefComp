@@ -33,10 +33,37 @@ def RunSimulation(mapdl, wdir, mainFile):
     
     return out
 
+def CreateInput(wdir, simZeroFile, compFactor, outNodeFile):
+    allResult = GetNodalData(wdir + simZeroFile)
+    
+    nodeCnt = len(allResult)
+    outputFile = wdir + outNodeFile
+    
+    f=open(outputFile,"w")  
+    
+    print("%s %68s" % ('!',"Nodal Information Dump"),file=f)
+    print("%s %58s%10i" % ('!',"Total Nodes =", nodeCnt),file=f)
+    print("%s%9s%20s%20s%20s" % ('!',"Node","X","Y","Z"),file=f)
+    print("nblock,3,,%i" % (nodeCnt),file=f)
+    print("(1i9,3e20.9e3)",file=f)
+
+    # Separate node locations and nodal displacements
+    nodes = allResult[:,1:4]
+    nodeDisp = allResult[:,4:7]    
+    for j in range(1,nodeCnt+1):
+        print("%9i%20.9E%20.9E%20.9E" % (j,nodes[j-1,0]+compFactor*nodeDisp[j-1,0],nodes[j-1,1]+compFactor*nodeDisp[j-1,1],nodes[j-1,2]+compFactor*nodeDisp[j-1,2]),file=f)
+        
+    print("-1",file=f)
+    print("! ====================================================================",file=f)
+    f.close()
+    
+    
+
 ### Use the Optimization routine to find the right scale factor instead
 ### Use scipy.optimize to minimize
 # First create a objective function to simplify the iterator
-def Objective(inputX, mapdl, wdir, mainFile, dispZero, target):
+def Objective(inputX, mapdl, wdir, mainFile, simZeroResult, target):
+    print(".")
     print(">>> Iteration input Scale factor: %f" % (inputX))
     nodalFileName = 'nodalData_IT.inp'
     nodalFileIt = 'COMP_RSLT_IT_%f.csv' % np.round(inputX,2) 
@@ -44,7 +71,8 @@ def Objective(inputX, mapdl, wdir, mainFile, dispZero, target):
     if(os.path.exists(wdir+nodalFileIt)==False):
         # Step: 1 : Run the simulation
         # Create compensated input file for the prescribed scale
-        SaveNodalInfo(dispZero, nodalFileName, wdir, -inputX, False)
+        # SaveNodalInfo(dispZero, nodalFileName, wdir, -inputX, False)
+        CreateInput(wdir, simZeroResult, -inputX, nodalFileName)
         # Run the simulation for prescribed scaleFactor
         result = RunSimulation(mapdl, wdir, mainFile)      # Same Result Object as the Reader class
         # Save simulation result
@@ -54,28 +82,29 @@ def Objective(inputX, mapdl, wdir, mainFile, dispZero, target):
     else:
         # Simulation results already exists, so retrieve from storage
         current = GetNodalData(wdir + nodalFileIt)
+        print('***  Using data from previously saved file.')
         
     
     # Step : 2 : Calculate Error
     nodalError, residualError = CompareNodes(target, current)
-    
-    print (">>>   Nodal Max Error: %f, \nNormalized residual Error: %f" % (nodalError,residualError))
-    
-    
+        
     return residualError
         
-
-
 
 ### EXPORT GEOMETRY FROM LAST SOLUTION
 def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
     
     # Do initial simulation
-    simZero = RunSimulation(mapdl, wdir, mainFile)
-    
+    simZeroResult = 'RESULT_IT0.csv'
+    if(os.path.exists(wdir+simZeroResult)==False):
+        rslt = RunSimulation(mapdl, wdir, 'mainInputBox0.dat')
+        SaveNodalInfo(rslt, simZeroResult, wdir, readFromFile=False, doCombined=False)
+    else:
+        print('*** Using a previously saved copy.')
+        
     # Call the scipy minimizer
     initialScale = 1
-    result = minimize(Objective, initialScale, (mapdl, wdir, mainFile, simZero, target), method='L-BFGS-B')
+    result = minimize(Objective, initialScale, (mapdl, wdir, mainFile, simZeroResult, target), method='L-BFGS-B')
     
     # Summarize the result
     print('Status : %s' % result['message'])
@@ -87,7 +116,7 @@ def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
     print('Solution: f(%s)' % (solution))
     
     print('>>> Iteration completed. ---')
-
+    
     
 def CompareNodes(target, current):
     # Both data structure are [N, X, Y, Z]
@@ -140,7 +169,7 @@ def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
     return None
      
 
-def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-1, appendTimeStamp=False):
+def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-1, appendTimeStamp=False, doCombined=True):
     
     if(readFromFile):
         # Create result object by loading the result file
@@ -165,7 +194,7 @@ def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-
     
     nodeCnt = len(nodes)
     
-    doCombined = True
+    # doCombined = True
     compFactor = factor       # To get deformed shape, use +1.
     rset = rsetMax
     tStep = result.solution_info(rset)['timfrq']
