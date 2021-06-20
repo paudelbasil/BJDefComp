@@ -12,63 +12,72 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pyvista as pv
 
+from scipy.optimize import minimize
 from ansys.mapdl.core import launch_mapdl
 from ansys.mapdl import reader as Reader
 
 
+# Calls APDL and runs the simulation, return result object
+def RunSimulation(mapdl, wdir, mainFile):
+    mapdl.clear()
+    mapdl.input(wdir+mainFile, verbose= False)
+    mapdl.finish
+    out = mapdl.result
+    
+    return out
+
+### Use the Optimization routine to find the right scale factor instead
+### Use scipy.optimize to minimize
+# First create a objective function to simplify the iterator
+def Objective(inputX, mapdl, wdir, mainFile, dispZero, target):
+    print(">>> Iteration input Scale factor: %f" % (inputX))
+    nodalFileName = 'nodalData_IT.inp'
+    nodalFileIt = 'COMP_RSLT_IT_%f.csv' % np.round(inputX,2) 
+    
+    if(os.path.exists(wdir+nodalFileIt)==False):
+        # Step: 1 : Run the simulation
+        # Create compensated input file for the prescribed scale
+        SaveNodalInfo(dispZero, nodalFileName, wdir, -inputX, False)
+        # Run the simulation for prescribed scaleFactor
+        result = RunSimulation(mapdl, wdir, mainFile)      # Same Result Object as the Reader class
+        # Save simulation result
+        SaveNodalInfo(result, nodalFileIt, wdir, 1, False) # Save Iteration result
+    
+        current = GetNodalData_Result(result, 1.0)
+    else:
+        # Simulation results already exists, so retrieve from storage
+        current = GetNodalData(wdir + nodalFileIt)
+        
+    
+    # Step : 2 : Calculate Error
+    nodalError, residualError = CompareNodes(target, current)
+    
+    print (">>>   Nodal Max Error: %f, \nNormalized residual Error: %f" % (nodalError,residualError))
+    
+    
+    return residualError
+        
+
+
+
 ### EXPORT GEOMETRY FROM LAST SOLUTION
 def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
-    itn = 0 
     
-    aggression = 0.9    # > 1 means faster approach, <1 mean slow approach
+    # Do initial simulation
+    simZero = RunSimulation(mapdl, wdir, mainFile)
     
-    # Step : 0 : Initial Values
-    residualError, nodalError    = 1.0, 1.0
-    lastResidlErr, lastNodErr    = 1.0, 1.0
-    oldFactor, scaleFactor       = 0.0, 0.0
+    # Call the scipy minimizer
+    initialScale = 1
+    result = minimize(Objective, initialScale, (mapdl, wdir, mainFile, target), method='L-BFGS-B')
     
-    ## ITERATION LOOP
-    while(residualError >errTol and nodalError > errTol and itn<maxItn):
-        print(">>> Iteration loop : %i, scale factor: %f" % (itn,scaleFactor))
-        nodalFileIt = 'COMP_RSLT_IT_%i.csv' % itn 
-        # Step: 1 : Run the simulation
-        mapdl.clear()
-        mapdl.input(wdir+mainFile, verbose=False)
-        mapdl.finish()
-        result = mapdl.result       # Same Result Object as the Reader class
-        # print(result)  # Display result for futher info
-        
-        itn = itn + 1
-        
-        # current = GetNodalData(nodalFileIt)
-        current = GetNodalData_Result(result, 1.0)
-        
-        # Step : 2 : Calculate Error
-        nodalError, residualError = CompareNodes(target, current)
-                
-        # Step : 3 : Calculate new scaleFactor
-        if(itn==0):
-            lastResidlErr, oldFactor = residualError, scaleFactor
-            scaleFactor = 1.0
-            
-        else:
-            dEdF = (residualError - lastResidlErr)/(scaleFactor-oldFactor)        
-            lastResidlErr, oldFactor = residualError, scaleFactor
-            scaleFactor = oldFactor+ (residualError-errTol)/dEdF*aggression
-            
-            
-        # Compensate geom
-        SaveNodalInfo(result, nodalFileIt, wdir, 1, False) # Save History
-        SaveNodalInfo(result, 'nodalData.inp', wdir, -scaleFactor, False)
-        
-    # Check if converged
-    if(itn>=maxItn):
-        # Not Converged
-        print('--- Compensation algorithm did NOT converge')
-    else:
-        # Converged
-        print('--- Compensation algorithm converged.')
-        SaveNodalInfo(result, 'nodalData.inp', wdir, 0, False)
+    # Summarize the result
+    print('Status : %s' % result['message'])
+    print('Total Iterations : %d' % result['nfev'])
+    
+    # evaluate solution
+    solution = result['x']
+    # evaluation = objective(solution)
+    print('Solution: f(%s)' % (solution))
     
     print('>>> Iteration completed. ---')
 
