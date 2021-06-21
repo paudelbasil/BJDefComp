@@ -17,10 +17,8 @@ from scipy.optimize import minimize
 from ansys.mapdl.core import launch_mapdl
 from ansys.mapdl import reader as Reader
 
+dbg = False
 
-def getTime():
-    ltime = time.localtime(time.time())
-    return time.asctime(ltime)
 
 # Calls APDL and runs the simulation, return result object
 def RunSimulation(mapdl, wdir, mainFile):
@@ -42,12 +40,17 @@ def RunSimulation(mapdl, wdir, mainFile):
         DESCRIPTION.
 
     '''
+    t=tic()
     ShowMsg(' Simulation started on : ' + getTime())
+    jname = 'sJob_%5d' % t
+    
     mapdl.clear()
-    mapdl.input(FullPath(mainFile,wdir), verbose= False)
+    #mapdl.jobname = jname
+    monitor=mapdl.input(FullPath(mainFile,wdir), verbose= False, progress_bar=True)
     mapdl.finish
     out = mapdl.result
     ShowMsg(' Simulation completed on : ' + getTime())
+    tok(t)
     
     return out
 
@@ -105,11 +108,13 @@ def Objective(inputX, mapdl, wdir, mainFile, simZeroResult, target):
         # Save simulation result
         SaveNodalInfo(result, nodalFileIt, wdir, 1, False) # Save Iteration result
     
-        current = GetNodalData_Result(result, 1.0)
+        #current = GetNodalData_Result(result, 1.0)
     else:
         # Simulation results already exists, so retrieve from storage
-        current = GetNodalData(FullPath(nodalFileIt,wdir))
         ShowMsg(' Using data from previously saved file.',3)
+    
+    # Get current simulation results from file
+    current = GetNodalData(FullPath(nodalFileIt,wdir))
         
     # Plot initial and final
     
@@ -134,24 +139,25 @@ def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
         rslt = RunSimulation(mapdl, wdir, 'mainInputBox0.dat')
         SaveNodalInfo(rslt, simZeroResult, wdir, readFromFile=False, doCombined=False)
     else:
-        ShowMsg(' Using a previously saved copy.',3)
+        ShowMsg(' Using a previously stored BASE SOLUTION.',3)
         
     # Call the scipy minimizer
     initialScale = 1
     
     # DOCS: https://docs.scipy.org/doc/scipy/reference/tutorial/optimize.html#unconstrained-minimization-of-multivariate-scalar-functions-minimize
     # Use NON-Gradient based iterative algorithm
-    # Options: xatol (absolute tolerance in x)
+    # Options: xatol (absolute tolerance in x), method='nelder-mead'
+                      
     result = minimize(Objective, initialScale, 
-                      (mapdl, wdir, mainFile, simZeroResult, target), 
-                      method='nelder-mead',
-                      options={'maxiter': maxItn, 'xatol': errTol,
-                               'disp':True})
+                      (mapdl, wdir, mainFile, simZeroResult, target),
+                      tol = errTol, method='nelder-mead',
+                      options={'maxiter': maxItn,'disp':True})
     
     # Summarize the result
     ShowMsg('------------------------------------------------------',-1)
     ShowMsg('Status : %s' % result['message'],2)
     ShowMsg('Total Iterations : %d' % result['nfev'],2)
+    ShowMsg('Optimum Value    : %d' % result['x'],2)
     ShowMsg('------------------------------------------------------',-1)
     
     # evaluate solution
@@ -181,7 +187,8 @@ def CompareNodes(target, current):
     # Both data structure are [N, X, Y, Z]
     nodes = target[:]
     nodeCount  = len(nodes)
-    ShowMsg('Rows count : %d, Cols count : %d' % (nodeCount,len(target[0])))
+    if(dbg):
+        ShowMsg('Rows count : %d, Cols count : %d' % (nodeCount,len(target[0])))
     
     nodalDist = nodeCount * [0]
     
@@ -202,7 +209,8 @@ def CompareNodes(target, current):
     
     ShowMsg("Max Nodal Diff: %10f Residual Error: %10f" % (nodalMax, globalMax),3)
     
-    print([np.shape(current), np.shape(target)])
+    if(dbg):
+        print([np.shape(current), np.shape(target)])
     
     PlotPoints(current, nodalDist,180,-90)
     return [nodalMax, globalMax]
@@ -315,14 +323,11 @@ def GetNodalData_Result(result, factor=1.0):
 
     Returns
     -------
-    nodalData : array(array())
+    nodalData : array(:,4)
         Nodal data from the mapdl.result with scaled displacments.
 
     '''
     rsetMax=result.nsets-1
-    
-    # Get nodal displacements
-    nnum,ndisp = result.nodal_displacement(rsetMax)
     
     # Plot nodal solution
     # result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True)
@@ -336,13 +341,17 @@ def GetNodalData_Result(result, factor=1.0):
     # tStep = result.solution_info(rset)['timfrq']
     
     # Get nodal solutions, along with nodal numbers
-    nodeNum, nodeDisp = result.nodal_displacement(rset)   # first set
+    nodeNum, nodeDisp = result.nodal_displacement(rset)   # last set
     nodalData = nodeCnt*[[0,0,0,0]]
     for j in range(nodeCnt):
-        nodalData[j]= [j+1, nodes[j-1,0]+compFactor*nodeDisp[j-1,0], nodes[j-1,1]+compFactor*nodeDisp[j-1,1], nodes[j-1,2]+compFactor*nodeDisp[j-1,2] ]
+        nX = nodes[j-1,0] + compFactor*nodeDisp[j-1,0]
+        nY = nodes[j-1,1] + compFactor*nodeDisp[j-1,1]
+        nZ = nodes[j-1,2] + compFactor*nodeDisp[j-1,2]
+        nodalData[j]= [j+1, nX, nY, nZ]
         
     # Return 2D array instead of list of list
-    return np.array(nodalData)
+    out = np.array(nodalData)
+    return out
 
 def PlotNodalSolution(rstfile, step=-1, readFromFile=True):
     '''
@@ -376,7 +385,11 @@ def PlotNodalSolution(rstfile, step=-1, readFromFile=True):
         rsetMax = step
         
     # Plot nodal solution
-    result.plot_nodal_solution(rsetMax,background='w',show_edges=True,show_displacement=True, notebook=False, window_size=[512,384])
+    result.plot_nodal_solution(rsetMax,background='w',
+                               show_edges=True,
+                               show_displacement=True, 
+                               notebook=False, 
+                               window_size=[512,384])
     return result
 
 def PlotPoints2(nodes):
@@ -489,6 +502,19 @@ def PlotPoints(point3d, cdata=None, v1=0,v2=0, ax = None):
     plt.show()
     return ax
 
+
+def tic():
+    return time.time()
+
+def tok(t):
+    el = tic() - t
+    ShowMsg(' Elapsed time : %8.3f s' % el)
+    return
+
+
+def getTime():
+    ltime = time.localtime(time.time())
+    return time.asctime(ltime)
 
     
 def ShowMsg(msg='', level=0):
