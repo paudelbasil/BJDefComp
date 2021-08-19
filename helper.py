@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jun 14 21:12:39 2021
+Modified on : 8.17/2021
 
 @author: bjp89
 """
@@ -413,6 +414,95 @@ def PlotNodalSolution(rstfile, step=-1, readFromFile=True):
                                window_size=[512,384])
     return result
 
+def GetNodalInfoFromRST(rstfile, step=-1, readFromFile=True):
+    '''
+    
+
+    Parameters
+    ----------
+    rstfile : TYPE
+        Either filepath of 'rst' or the result object variable.
+    step : TYPE, optional
+        DESCRIPTION. The default is -1.
+    readFromFile : bool, optional
+        If set to False, rstfile is 'mapdl.result' object. The default is True.
+
+    Returns
+    -------
+    result : [nodeNum, nodeDisp]  
+        List of nodes and nodal displacements.
+
+    '''
+    if(readFromFile):
+        # Create result object by loading the result file
+        # Working with result after simulation
+        result = Reader.read_binary(rstfile)  # Using Reader
+    else:
+        result = rstfile
+
+    if(step<0):
+        rsetMax=result.nsets-1
+    else:
+        rsetMax = step
+    
+    # Get nodal solutions, along with nodal numbers
+    rslt = GetNodalData_Result(result, 1.0, step)
+    
+    return rslt
+    pass
+# end def
+
+
+def MergeRSTResults(wdir, jobname, numFiles, step=-1):
+    '''
+    This method individually load each rst files and extract nodal deformations,
+        then combine into one array of nodes.
+
+    Parameters
+    ----------
+    wdir : TYPE
+        DESCRIPTION.
+    jobname : TYPE
+        DESCRIPTION.
+    numFiles : TYPE
+        DESCRIPTION.
+    step : TYPE, optional
+        DESCRIPTION. The default is -1.
+
+    Returns
+    -------
+    nNodes : TYPE
+        DESCRIPTION.
+
+    '''
+    combNodes= []
+    
+    for f in range(numFiles):
+        rstfile = FullPath(jobname + "_" + str(f) + ".rst", wdir)
+        
+        rslt = GetNodalInfoFromRST(rstfile, step, True)
+        
+        combNodes.extend(rslt)    # Only x,y,z info
+    
+    
+    nNodes= np.array(combNodes)
+    return nNodes
+    pass
+#end def
+
+def CombineRSTResults(wdir, jobname, numFiles, step):
+    result=''
+    
+    if(step<0):
+        rsetMax=result.nsets-1
+    else:
+        rsetMax = step
+        
+    mapdl = launch_mapdl()
+    
+    pass
+
+    
 def PlotPoints2(nodes):
     
     ptCloud = nodes[:,1:4]  # Disregard the first column (nodeIDs)
@@ -443,6 +533,46 @@ def GetNodalData(file):
                      header=None)
     dfarray = df.values
     return dfarray
+
+def WriteNodesToFile(nodes, wdir, outfile):
+    '''
+    Writes Nodes to a file as a nodeblock
+
+    Parameters
+    ----------
+    nodes : Array of array([[nodeNum, X,Y,Z],])
+        Nodal positional information
+    wdir : str
+        directory of file        
+    outfile : str, 
+        filename with extension
+        
+    Returns
+    -------
+    None.
+
+    '''
+    
+    nodeCnt = len(nodes)            # number of nodes
+    nodeNum = nodes[:,0]
+    fullname = FullPath(outfile, wdir) 
+    f=open(fullname,"w")  
+    
+    print("%s %68s" % ('!',"Nodal Information Dump"),file=f)
+    print("%s %58s%10i" % ('!',"Total Nodes =", nodeCnt),file=f)
+    print("%s%9s%20s%20s%20s" % ('!',"Node","X","Y","Z"),file=f)
+    print("nblock,3,,%i" % (nodeCnt),file=f)
+    print("(1i9,3e20.9e3)",file=f)
+
+        
+    for node in nodes:
+        print("%9i%20.9E%20.9E%20.9E" % (node[0],node[1], node[2],node[3]),file=f)
+        
+    print("-1",file=f)
+    print("! ====================================================================",file=f)
+    f.close()
+    pass
+#end def
 
 def FullPath(file, wdir):
     '''

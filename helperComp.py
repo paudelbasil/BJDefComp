@@ -81,8 +81,6 @@ def CreateInput(wdir, simZeroFile, compFactor, outNodeFile):
     print("! ====================================================================",file=f)
     f.close()
     
-    
-
 ### Use the Optimization routine to find the right scale factor instead
 ### Use scipy.optimize to minimize
 # First create a objective function to simplify the iterator
@@ -128,7 +126,6 @@ def Objective(inputX, mapdl, wdir, mainFile, simZeroResult, target):
         
     return residualError
         
-
 ### EXPORT GEOMETRY FROM LAST SOLUTION
 def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
     
@@ -165,7 +162,6 @@ def Iterate(mapdl, target, errTol = 1e-5, maxItn=10, wdir='', mainFile =''):
     # evaluation = objective(solution)
     #print('Solution: f(%s)' % (solution))
     ShowMsg('Iteration completed. ---')
-    
     
 def CompareNodes(target, current):
     '''
@@ -241,7 +237,6 @@ def SaveDefHistory(rstfile, outFile, wdir='', factor=1, readFromFile=True):
     
     return None
      
-
 def SaveNodalInfo(rstfile, outFile, wdir='', factor=1, readFromFile=True, step=-1, appendTimeStamp=False, doCombined=True):
     
     if(readFromFile):
@@ -400,7 +395,6 @@ def PlotPoints2(nodes):
             eye_dome_lighting=True, window_size=[512,384], parallel_projection=True)
     return pc
 
-
 def GetNodalData(file):
     '''
     
@@ -463,7 +457,6 @@ def SplitFileName(fname):
     fileName = fname.split('.'+fileExt)[0]
     return [fileName, fileExt]
 
-
 def PlotPoints(point3d, cdata=None, v1=0,v2=0, ax = None):
     """    
 
@@ -502,7 +495,6 @@ def PlotPoints(point3d, cdata=None, v1=0,v2=0, ax = None):
     plt.show()
     return ax
 
-
 def tic():
     return time.time()
 
@@ -511,11 +503,9 @@ def tok(t):
     ShowMsg(' Elapsed time : %8.3f s' % el)
     return
 
-
 def getTime():
     ltime = time.localtime(time.time())
     return time.asctime(ltime)
-
     
 def ShowMsg(msg='', level=0):
     if(level == 0):
