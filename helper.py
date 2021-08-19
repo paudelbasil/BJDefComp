@@ -490,15 +490,17 @@ def MergeRSTResults(wdir, jobname, numFiles, step=-1):
     pass
 #end def
 
-def CombineRSTResults(wdir, jobname, numFiles, step):
-    result=''
-    
-    if(step<0):
-        rsetMax=result.nsets-1
-    else:
-        rsetMax = step
+def CombineRSTResults(wdir, jobname, numFiles):
+    '''
+        Combines distributed RST files to one huge RST file
+        This works when the solution is terminated due to error or other reasons.
         
-    mapdl = launch_mapdl()
+    '''            
+    mapdl = launch_mapdl(nproc=numFiles, jobname=jobname, run_location=wdir, override=True)
+    mapdl.aux2()
+    mapdl.combine('rst')
+    mapdl.exit()
+    
     
     pass
 
