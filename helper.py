@@ -37,7 +37,7 @@ def search_string_in_file(file_name, string_to_search):
     # Return list of tuples containing line numbers and lines where string is found
     return list_of_results
 
-def SplitDsDat(wdir, dsdatFile, newNamePref, nodeBlock=True, elemBlock=True, contBlock=True,matlBlock=False):
+def SplitDsDat(wdir, dsdatFile, newNamePref, nodeBlock=True, elemBlock=True, contBlock=True, loadBlock=True, matlBlock=False):
     '''
         This method splits the ds.dat file created by workbench mechanical into multiple files.
     '''
@@ -45,26 +45,37 @@ def SplitDsDat(wdir, dsdatFile, newNamePref, nodeBlock=True, elemBlock=True, con
 
     # Open the source file
     source = FullPath(dsdatFile, wdir)
+    
+    # Define names for splitted files
     targetMain = FullPath(newNamePref + "_main" + ext, wdir)
     targetNode = FullPath(newNamePref + "_node" + ext, wdir)
     targetElem = FullPath(newNamePref + "_elem" + ext, wdir)
     targetCont = FullPath(newNamePref + "_cont" + ext, wdir)
+    targetLoad = FullPath(newNamePref + "_load" + ext, wdir)
     targetMatl = FullPath(newNamePref + "_matl" + ext, wdir)
-    targetWriter, tMain,tNode,tElem,tCont,tMatl = None,None,None,None,None,None
+    
+    # Initialize
+    targetWriter, tMain,tNode,tElem,tCont,tLoad,tMatl = None,None,None,None,None,None,None
 
     # block descriptors
-    blockDesc = {'node': ['nblock','-1'], 'elem':['/wb,elem,start','/wb,elem,end'], 'cont':['/wb,contact,start','/wb,contact,end'], 'matl':['/wb,mat,start','/wb,mat,end']}
+    blockDesc = {'node': ['nblock','-1\n'], 
+                 'elem':['/wb,elem,start','/wb,elem,end'], 
+                 'cont':['/wb,contact,start','/wb,contact,end'], 
+                 'load':['/wb,load,start','/wb,load,end'], 
+                 'matl':['/wb,mat,start','/wb,mat,end']
+                 }
 
     # open the main target
     tMain = open(targetMain,'w')
     if(nodeBlock): tNode=open(targetNode,'w')
     if(elemBlock): tElem=open(targetElem,'w')
     if(contBlock): tCont=open(targetCont,'w')
+    if(loadBlock): tLoad=open(targetLoad,'w')
     if(matlBlock): tMatl=open(targetMatl,'w')
     
     line_number = 0
     
-    isNodeBlock,isElemBlock,isContBlock,isMatlBlock = False,False,False,False
+    isNodeBlock,isElemBlock,isContBlock,isMatlBlock, isLoadBlock = False,False,False,False,False
     isMainBlock = True
 
     targetWriter = tMain        # start with main
@@ -75,7 +86,7 @@ def SplitDsDat(wdir, dsdatFile, newNamePref, nodeBlock=True, elemBlock=True, con
             # For each line, check if line contains the string
             line_number += 1
 
-
+            #----------------------------------------------------------------
             if nodeBlock and isMainBlock:
                 if not isNodeBlock:
                     if (blockDesc['node'][0] in line): 
@@ -83,49 +94,56 @@ def SplitDsDat(wdir, dsdatFile, newNamePref, nodeBlock=True, elemBlock=True, con
                         targetWriter = tNode
                         tMain.write("/input," + newNamePref + "_node" + ext + '\n')
 
-                else:
-                    if((blockDesc['node'][1] in line)): isNodeBlock=False
-                # If yes, then add the line number & line as a tuple in the list
-                #list_of_results.append((line_number, line.rstrip()))
+            elif isNodeBlock:
+                if((blockDesc['node'][1] in line)): isNodeBlock=False
             
+            #----------------------------------------------------------------
             if elemBlock and isMainBlock:
                 if not isElemBlock:
                     if (blockDesc['elem'][0] in line): 
                         isElemBlock = True
                         targetWriter = tElem
                         tMain.write("/input," + newNamePref + "_elem" + ext+ '\n')
-                
-                
-                else:
-                    if((blockDesc['elem'][1] in line)): isElemBlock=False
+            elif isElemBlock:
+                if((blockDesc['elem'][1] in line)): isElemBlock=False
             
+            #----------------------------------------------------------------
             if contBlock and isMainBlock:
                 if not isContBlock:
                     if (blockDesc['cont'][0] in line): 
                         isContBlock = True
                         targetWriter = tCont
                         tMain.write("/input," + newNamePref + "_cont" + ext+ '\n')
-                
-                
-                else:
-                    if((blockDesc['cont'][1] in line)): isContBlock=False
+            elif isContBlock:
+                if((blockDesc['cont'][1] in line)): isContBlock=False
             
+            #----------------------------------------------------------------
+            if loadBlock and isMainBlock:
+                if not isLoadBlock:
+                    if (blockDesc['load'][0] in line): 
+                        isLoadBlock = True
+                        targetWriter = tLoad
+                        tMain.write("/input," + newNamePref + "_load" + ext+ '\n')
+            elif isLoadBlock:
+                if((blockDesc['load'][1] in line)): isLoadBlock=False
+            
+            
+            #----------------------------------------------------------------
             if matlBlock and isMainBlock:
                 if not isElemBlock:
                     if (blockDesc['matl'][0] in line): 
                         isMatlBlock = True
                         targetWriter = tMatl
                         tMain.write("/input," + newNamePref + "_matl" + ext+ '\n')
-                
-                
-                else:
-                    if((blockDesc['matl'][1] in line)): isMatlBlock=False
+            elif isMatlBlock:
+                if((blockDesc['matl'][1] in line)): isMatlBlock=False
+            #----------------------------------------------------------------
             
 
             targetWriter.write(line.rstrip()+ '\n')
 
             # switch the writer if it changed
-            isMainBlock = not ( isNodeBlock or isElemBlock or isContBlock or isMatlBlock)
+            isMainBlock = not ( isNodeBlock or isElemBlock or isContBlock or isMatlBlock or isLoadBlock)
             if isMainBlock: targetWriter = tMain
 
     # Close all file handlers
@@ -133,6 +151,7 @@ def SplitDsDat(wdir, dsdatFile, newNamePref, nodeBlock=True, elemBlock=True, con
     if(nodeBlock): tNode.close()
     if(elemBlock): tElem.close()
     if(contBlock): tCont.close()
+    if(loadBlock): tLoad.close()
     if(matlBlock): tMatl.close()
 
     
