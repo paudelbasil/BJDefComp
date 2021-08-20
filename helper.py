@@ -20,6 +20,126 @@ from ansys.mapdl import reader as Reader
 
 dbg = False
 
+def search_string_in_file(file_name, string_to_search):
+    """Search for the given string in file and return lines containing that string,
+    along with line numbers"""
+    line_number = 0
+    list_of_results = []
+    # Open the file in read only mode
+    with open(file_name, 'r') as read_obj:
+        # Read all lines in the file one by one
+        for line in read_obj:
+            # For each line, check if line contains the string
+            line_number += 1
+            if string_to_search in line:
+                # If yes, then add the line number & line as a tuple in the list
+                list_of_results.append((line_number, line.rstrip()))
+    # Return list of tuples containing line numbers and lines where string is found
+    return list_of_results
+
+def SplitDsDat(wdir, dsdatFile, newNamePref, nodeBlock=True, elemBlock=True, contBlock=True,matlBlock=False):
+    '''
+        This method splits the ds.dat file created by workbench mechanical into multiple files.
+    '''
+    ext = '.inp'
+
+    # Open the source file
+    source = FullPath(dsdatFile, wdir)
+    targetMain = FullPath(newNamePref + "_main" + ext, wdir)
+    targetNode = FullPath(newNamePref + "_node" + ext, wdir)
+    targetElem = FullPath(newNamePref + "_elem" + ext, wdir)
+    targetCont = FullPath(newNamePref + "_cont" + ext, wdir)
+    targetMatl = FullPath(newNamePref + "_matl" + ext, wdir)
+    targetWriter, tMain,tNode,tElem,tCont,tMatl = None,None,None,None,None,None
+
+    # block descriptors
+    blockDesc = {'node': ['nblock','-1'], 'elem':['/wb,elem,start','/wb,elem,end'], 'cont':['/wb,contact,start','/wb,contact,end'], 'matl':['/wb,mat,start','/wb,mat,end']}
+
+    # open the main target
+    tMain = open(targetMain,'w')
+    if(nodeBlock): tNode=open(targetNode,'w')
+    if(elemBlock): tElem=open(targetElem,'w')
+    if(contBlock): tCont=open(targetCont,'w')
+    if(matlBlock): tMatl=open(targetMatl,'w')
+    
+    line_number = 0
+    
+    isNodeBlock,isElemBlock,isContBlock,isMatlBlock = False,False,False,False
+    isMainBlock = True
+
+    targetWriter = tMain        # start with main
+    # Open the file in read only mode
+    with open(source, 'r') as read_obj:
+        # Read all lines in the file one by one
+        for line in read_obj:
+            # For each line, check if line contains the string
+            line_number += 1
+
+
+            if nodeBlock and isMainBlock:
+                if not isNodeBlock:
+                    if (blockDesc['node'][0] in line): 
+                        isNodeBlock = True
+                        targetWriter = tNode
+                        tMain.write("/input," + newNamePref + "_node" + ext + '\n')
+
+                else:
+                    if((blockDesc['node'][1] in line)): isNodeBlock=False
+                # If yes, then add the line number & line as a tuple in the list
+                #list_of_results.append((line_number, line.rstrip()))
+            
+            if elemBlock and isMainBlock:
+                if not isElemBlock:
+                    if (blockDesc['elem'][0] in line): 
+                        isElemBlock = True
+                        targetWriter = tElem
+                        tMain.write("/input," + newNamePref + "_elem" + ext+ '\n')
+                
+                
+                else:
+                    if((blockDesc['elem'][1] in line)): isElemBlock=False
+            
+            if contBlock and isMainBlock:
+                if not isContBlock:
+                    if (blockDesc['cont'][0] in line): 
+                        isContBlock = True
+                        targetWriter = tCont
+                        tMain.write("/input," + newNamePref + "_cont" + ext+ '\n')
+                
+                
+                else:
+                    if((blockDesc['cont'][1] in line)): isContBlock=False
+            
+            if matlBlock and isMainBlock:
+                if not isElemBlock:
+                    if (blockDesc['matl'][0] in line): 
+                        isMatlBlock = True
+                        targetWriter = tMatl
+                        tMain.write("/input," + newNamePref + "_matl" + ext+ '\n')
+                
+                
+                else:
+                    if((blockDesc['matl'][1] in line)): isMatlBlock=False
+            
+
+            targetWriter.write(line.rstrip()+ '\n')
+
+            # switch the writer if it changed
+            isMainBlock = not ( isNodeBlock or isElemBlock or isContBlock or isMatlBlock)
+            if isMainBlock: targetWriter = tMain
+
+    # Close all file handlers
+    tMain.close()
+    if(nodeBlock): tNode.close()
+    if(elemBlock): tElem.close()
+    if(contBlock): tCont.close()
+    if(matlBlock): tMatl.close()
+
+    
+    # Source is auto closed by the 'with' statement    
+
+    pass
+
 
 # Calls APDL and runs the simulation, return result object
 def RunSimulation(mapdl, wdir, mainFile):
